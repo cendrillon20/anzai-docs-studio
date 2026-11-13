@@ -108,7 +108,7 @@ theme.addEventListener('change',()=>{document.body.dataset.theme=theme.value;sav
 $('#new').onclick=()=>{if(!confirm('¿Crear un documento nuevo? Se reemplazará el documento guardado en este navegador.'))return;showEditor();editor.innerHTML='<h1>Nuevo documento</h1><p><br></p>';$('#title').value='Nuevo documento';$('#reply').textContent='¡Tu hoja en blanco está lista! Escribe directamente o cuéntame qué estructura deseas preparar.';count();save();editor.focus()};
 let pdfText='',readerDark=false;
 $('#readerMode').onclick=()=>{readerDark=!readerDark;editor.classList.toggle('reader-dark',readerDark);$('#pdfPages').classList.toggle('reader-dark',readerDark);$('#readerMode').textContent=readerDark?'☀️ Documento claro':'🌙 Oscurecer documento'};
-function showEditor(){editor.classList.remove('studio-hidden');if($('#toggleToolbar').checked)$('#editToolbar').classList.remove('studio-hidden');$('#dropzone').classList.add('studio-hidden');$('#pdfPanel').hidden=true}
+function showEditor(){editor.classList.remove('studio-hidden');$('#editToolbar').classList.remove('studio-hidden');$('#dropzone').classList.add('studio-hidden');$('#pdfPanel').hidden=true}
 $('#pickPdf').onclick=()=>$('#pdfFile').click();
 $('#uploadPdf').onclick=()=>$('#pdfFile').click();
 $('#tabEdit').onclick=showEditor;
@@ -135,6 +135,9 @@ $('#addTable').onclick=()=>{showEditor();const table=document.createElement('tab
 $('#addLink').onclick=()=>{const url=prompt('Dirección del enlace (https://...)');if(url&&(url.startsWith('https://')||url.startsWith('http://'))){editor.focus();document.execCommand('createLink',false,url);count()}};
 
 let lastGenerated='';
+function appendDraft(draft){const p=document.createElement('section');p.className='research-draft';draft.split(/\\n+/).filter(Boolean).forEach(line=>{const el=document.createElement(line.startsWith('# ')?'h1':line==='Introducción'||line==='Conclusiones'||line==='Referencias'?'h2':'p');el.textContent=line.replace(/^# /,'');p.appendChild(el)});editor.appendChild(p);count();save()}
+function makeOfflineDraft(topic){const t=normalizeQuery(topic);return '# '+t+'\\n\\nIntroducción\\n\\nEl presente documento aborda el tema de '+t+'. Su propósito es establecer una base de trabajo organizada que permita estudiar el contexto, identificar aspectos relevantes y desarrollar un análisis claro.\\n\\nDesarrollo\\n\\nPara comprender '+t+', conviene comenzar con una definición precisa, revisar sus antecedentes y explicar los conceptos fundamentales. A continuación, es recomendable identificar aplicaciones, características, beneficios y limitaciones, respaldando cada afirmación con fuentes verificables.\\n\\nAnálisis\\n\\nEl análisis deberá relacionar los conceptos anteriores con ejemplos concretos, explicar sus implicaciones y distinguir entre hechos comprobados, hipótesis y opiniones.\\n\\nConclusiones\\n\\nEl tema requiere investigación adicional para elaborar conclusiones específicas. Este texto es una plantilla inicial y no sustituye una investigación documentada.'}
+
 let lastSources=[];
 function normalizeQuery(q){return q.replace(/^(redacta|escribe|investiga|busca|haz|prepara|genera|quiero|necesito|una|un|el|la|sobre|acerca de|información|introducción|detallada|técnica|de|del|en)\\s+/gi,'').replace(/[.!?]+$/,'').trim().slice(0,110)||q.slice(0,110)}
 function makeDraft(title,items){
@@ -157,7 +160,7 @@ const res=await fetch('https://es.wikipedia.org/api/rest_v1/page/summary/'+encod
 if(!res.ok)return null;const data=await res.json();if(!data.extract||data.type==='disambiguation')return null;
 return {title:data.title,extract:data.extract,url:data.content_urls?.desktop?.page||'https://es.wikipedia.org/wiki/'+encodeURIComponent(title.replace(/ /g,'_'))};
 }
-$('#insertAI').onclick=()=>{if(!lastGenerated)return;showEditor();lastGenerated.split(/\\n{2,}/).filter(Boolean).forEach(chunk=>{const p=document.createElement('p');p.textContent=chunk;editor.appendChild(p)});count();save();$('#reply').textContent='Borrador insertado en el editor. Revisa las fuentes y edita el contenido.';$('#insertAI').hidden=true};
+$('#insertAI').onclick=()=>{if(!lastGenerated)return;showEditor();appendDraft(lastGenerated);$('#reply').textContent='Se añadió otra copia del borrador al editor.'};
 $('#ask').onclick=async()=>{
 const input=$('#prompt').value.trim();if(!input){$('#reply').textContent='Escribe un tema que quieras investigar.';return}
 const btn=$('#ask');btn.disabled=true;btn.textContent='Buscando información…';$('#aiStatus').textContent='Consultando fuentes públicas';$('#insertAI').hidden=true;$('#sources').replaceChildren();
@@ -172,8 +175,8 @@ lastSources=found;lastGenerated=makeDraft(query,found);
 $('#reply').textContent=lastGenerated;
 const heading=document.createElement('strong');heading.textContent='Fuentes consultadas:';$('#sources').appendChild(heading);
 found.forEach(item=>{const row=document.createElement('div'),link=document.createElement('a');link.href=item.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=item.title;link.style.color='var(--accent)';row.appendChild(link);$('#sources').appendChild(row)});
-$('#insertAI').hidden=false;$('#aiStatus').textContent=found.length+' fuentes encontradas. Borrador listo.';
-}catch(err){$('#reply').textContent='No pude completar la investigación: '+(err.message||String(err));$('#aiStatus').textContent='Consulta fallida';}
+$('#insertAI').hidden=false;$('#aiStatus').textContent=found.length+' fuentes encontradas. Borrador listo.';showEditor();appendDraft(lastGenerated);
+}catch(err){lastGenerated=makeOfflineDraft(input);$('#reply').textContent='No fue posible consultar Wikipedia: '+(err.message||String(err))+'\\n\\nPreparé un borrador inicial sin datos externos para que puedas comenzar a editarlo.\\n\\n'+lastGenerated;$('#aiStatus').textContent='Borrador inicial sin fuentes web';$('#insertAI').hidden=false;showEditor();appendDraft(lastGenerated);}
 finally{btn.disabled=false;btn.textContent='📚 Investigar y redactar'}
 };
 (function setupFarm(){
